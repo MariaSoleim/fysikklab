@@ -1,7 +1,21 @@
 import matplotlib.pyplot as plt
+import numpy as np
 import os
 from openpyxl import Workbook, load_workbook
 
+def iptrack(x, y):
+    return np.polyfit(x, y, 15)
+
+
+def trvalues(p, x):
+    y = np.polyval(p, x)
+    dp = np.polyder(p)
+    dydx = np.polyval(dp, x)
+    ddp = np.polyder(dp)
+    d2ydx2 = np.polyval(ddp, x)
+    alpha = np.arctan(-dydx)
+    R = (1.0+dydx**2)**1.5/d2ydx2
+    return [y, dydx, d2ydx2, alpha, R]
 
 class Sheet:
     def __init__(self, sheet):
