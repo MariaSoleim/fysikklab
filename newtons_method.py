@@ -9,16 +9,20 @@ r = 0.02 #Fyll inn riktig radius
 I = 2/3*m*r**2
 
 _file = os.getcwd() + "/rapport/run.txt"
-data=np.loadtxt(_file)
-x_values = data[:,1]
+
 poly = iptrack.iptrack(_file)
 
+data=np.loadtxt(_file)
+x_values = data[:,1]
+
+
+a_values = []
 for x in x_values:
-    a_values = []
-    y, dydx, d2ydx2, alpha, R = iptrack.trvalues(poly, x)
+    alpha = iptrack.trvalues(poly, x)[3]
     a_values.append(g*math.sin(alpha)/(1+I/(m*r**2)))
 
-print(a_values)
+for a in a_values:
+    print(a)
 
 """
 x = 0.01229306768 #Hente ut denne verdien fra skjema med kode
