@@ -3,7 +3,7 @@ import math
 import os
 import numpy as np
 
-g = 9.81 #Fyll inn riktig g
+g = 9.8214675 # +-0.0000004
 m = 0.0027 #Fyll inn riktig masse
 r = 0.02 #Fyll inn riktig radius
 I = 2/3*m*r**2
