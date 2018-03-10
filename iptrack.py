@@ -26,6 +26,7 @@ _file = os.getcwd() + "/rapport/run.txt"
 
 def iptrack(filename):
 	data=np.loadtxt(filename,skiprows=2)
+	print([round(x,10) for x in data[:,2]])
 	return np.polyfit(data[:,1],data[:,2],15)
 
 def trvalues(p,x):
@@ -40,6 +41,6 @@ def trvalues(p,x):
 
 if __name__ == "__main__":
 	poly = iptrack(_file)
-	print(poly)
-	print(trvalues(poly, 0.5))
+	#print(poly)
+	#print(trvalues(poly, 0.01229306768))
 	#print(trvalues(poly, 0.5))
