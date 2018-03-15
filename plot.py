@@ -17,14 +17,12 @@ def plot_color(col, label):
     return mpatches.Patch(color=col, label=label)
 
 
-Linear = plot_color('blue', 'Linear')
-Sine = plot_color('red', 'Sine')
-Steep = plot_color('green', 'Steep')
+Linear = plot_color('red', 'Lineær')
+Sine = plot_color('blue', 'Sinus')
+Steep = plot_color('green', 'Bratt')
 
 
-_colors = {'Linear': 'r--',
-           'Sine': 'b-',
-           'Steep': 'g-.'}
+colors = {'Linear': 'r--', 'Sine': 'b-', 'Steep': 'g:'}
 
 
 def euler(v, alpha):
@@ -143,6 +141,7 @@ x_axes = []
 y_axes = []
 
 for k, v in data_dict.items():
+    print(k)
     # iterate over every xls document
     fig_num = 0
     euler_vals = {}  # a list of every point from each list (10)
@@ -162,7 +161,26 @@ for k, v in data_dict.items():
         #          euler_vals[current_time] = []
         #      current_time += 1
         #  current_time = 0
-        for point in s.friction:  # plot friction per distance
+
+        """
+        friction per distance: zip(s.x, s.friction)
+        friction per time: s.friction
+        y per x: zip(s.x, s.y)
+        y per time: s.y
+        acceleration per dist: zip(s.x, s.acc)
+        acceleration per time: s.acc
+        """
+        plots = {
+            'f_dist': zip(s.x, s.friction),
+            'f_t': s.friction,
+            'y_x': zip(s.x, s.y),
+            'y_t': s.y,
+            'acc_dist': zip(s.x, s.acc),
+            'acc_t': s.acc
+        }
+
+        # TODO: set x,y data here
+        for point in plots['f_dist']:  # plot friction per distance
             try:
                 real_vals[current_time].append(point)
             except KeyError:
@@ -184,20 +202,22 @@ for k, v in data_dict.items():
     for key in invalid_real_keys:
         real_vals.pop(key, None)
 
+    x_axis = []  # this is common between all plots
     euler_y_axis = []
     euler_y_axis_err = []
     y_axis = []
     y_axis_err = []
-    x_axis = []  # x-axis
-    for time, data in real_vals.items():
-        x_data, y_data = data
+    for x_data, y_data in real_vals.items():
+        if type(y_data[0]) == tuple:
+            x_data = np.mean([val[0] for val in y_data])
+            y_data = [val[1] for val in y_data]
         # do something with the data here!
         x_axis.append(x_data)
         variance = np.var(y_data)
         std = np.std(y_data)
         avg = np.mean(y_data)
         y_axis.append(avg)
-        y_axis_err.append(variance)
+        y_axis_err.append(std)
 
     #  euler_frames = []
     #  for time, data in euler_vals.items():
@@ -214,28 +234,25 @@ for k, v in data_dict.items():
     #  plt.plot(x_axis, y_axis)
     #  plt.plot(x_axis, euler_y_axis)
     #  plt.errorbar(x_axis, euler_y_axis, yerr=euler_y_axis_err, fmt="-")
-    #  _color = _colors[k]
-    #  plt.errorbar(x_axis, y_axis, yerr=y_axis_err, fmt=_color)
+    plt.errorbar(x_axis, y_axis, yerr=y_axis_err, fmt=colors[k], ecolor='#AAAA00')  # fetch the color of the key
 
-    x_axes.append(len(x_axis))
-    y_axes.append(y_axis)
-    plt.plot(x_axis, y_axis)
+    #  x_axes.append(len(x_axis))
+    #  y_axes.append(y_axis)
 
 #  longest_x_len = max(x_axes)
-x = np.arange(0, max(x_axes)+1, 1)
+#  x = np.arange(0, max(x_axes)+1, 1)
 #  print('longest x: ' + str(max(x_axes)))
-for y in y_axes:  # iterate data points
-    new_y = y
-    while len(new_y) <= max(x_axes):
-        print('xd')
-        new_y.append(0)
-_color = _colors[k]
-plt.errorbar(x, new_y, yerr=y_axis_err, fmt=_color)
+#  for y in y_axes:  # iterate data points
+#      new_y = y
+#      while len(new_y) <= max(x_axes):
+#          print('xd')
+#          new_y.append(0)
+#  _color = _colors[k]
+#  plt.errorbar(x, new_y, yerr=y_axis_err, fmt=_color)
 
 
 # do something with s here
 plt.legend(handles=[Linear, Sine, Steep])
-plt.title("friction")
-plt.ylabel('friction (N)')
-plt.xlabel('x_axis (100 fps)')
+plt.ylabel('friksjon (N)')
+plt.xlabel('distanse (m)')
 plt.show()
