@@ -7,7 +7,7 @@ from openpyxl import Workbook, load_workbook
 
 
 g = 9.8214675  # +-0.0000004
-m = 0.0027  # Fyll inn riktig masse
+m = 0.00285  # +/- 0.0001
 r = 0.02  # Fyll inn riktig radius
 h = 0.01
 inertia = 2/3*m*r**2
@@ -20,6 +20,9 @@ def plot_color(col, label):
 Linear = plot_color('red', 'Lineær')
 Sine = plot_color('blue', 'Sinus')
 Steep = plot_color('green', 'Bratt')
+
+Numeric = plot_color('black', 'Numerisk data')
+Realdata = plot_color('red', 'Eksperimentell data')
 
 
 colors = {'Linear': 'r-', 'Sine': 'b-', 'Steep': 'g-'}
@@ -61,12 +64,14 @@ class Sheet:
 
         # compute the acceleration at each point
         self.acc = [self.compute_acceleration(x) for x in self.x]
+        self.velocity = [self.compute_acceleration(x) for x in self.x]
         self.friction = [self.compute_friction(x) for x in self.x]
         self.normalforce = [self.compute_normal_power(x) for x in self.x]
 
         # for use by eulers method, initialize default values
         self.euler_velocity = [0]
         self.euler_dist = [self.x[0]]
+        self.euler_y = [self.y[0]]
         self.euler_acc = [self.compute_acceleration()]
 
     def col(self, col_name):
@@ -95,24 +100,39 @@ class Sheet:
             # choose the first point as default initial value
             point = self.x[0]
         alpha = get_alpha(self.poly, point)
-        return g*math.sin(alpha)/(1+(inertia/m*r**2))
+        a = g*math.sin(alpha)/(1+(inertia/m*r**2))
+        #  print('alpha: \t' + str(alpha) + ', aks = \t' + str(a))
+        return a
+
+    def compute_velocity(self, point=None):
+        alpha = get_alpha(self.poly, point)
+        return h*g*math.sin(alpha)/(1 + (inertia/m*r**2))
 
     """ NUMERICS """
     def euler_iteration(self):
         # fetch the first items in the experimental data sets
         x = self.euler_dist[-1]
+        y = self.euler_y[-1]
         v = self.euler_velocity[-1]
         alpha = get_alpha(self.poly, x)
 
         # only estimate the next point if the x value
         # does not exceed the real limit
-        x_next = x + h*v
+        v_x = math.cos(alpha) * v
+        v_y = math.sin(alpha) * v
+        #  print(str(v_x) + "\t" + str(v_y) + "\t" + str(v))
+        # decompose into x, y, knowing the angle
+        x_next = x + h*v_x
+        y_next = y + h*v_y
         if x_next > max(self.x):
             x_next = x
+        if y_next > max(self.y):
+            y_next = y
         v_next = v + h*g*math.sin(alpha)/(1 + (inertia/m*r**2))
         a_next = self.compute_acceleration(x_next)
 
         self.euler_dist.append(x_next)
+        self.euler_y.append(y_next)
         self.euler_velocity.append(v_next)
         self.euler_acc.append(a_next)
 
@@ -143,6 +163,7 @@ def init():
 init()
 
 for k, v in data_dict.items():
+    #  fig = plt.figure()
     print(k)
     # iterate over every xls document
     fig_num = 0
@@ -151,7 +172,15 @@ for k, v in data_dict.items():
     # for each sheet!
     time_spent = []
     for s in v:
+        #  plt.subplot(5, 2, fig_num+1)
+        fig_num += 1
         s.compute_euler()
+        plt.plot(s.euler_dist, s.euler_acc, '#000000')
+        plt.plot(s.x, s.acc, 'r:')
+        plt.legend(handles=[Numeric, Realdata])
+        plt.ylabel('akselerasjon (m/s^2)')
+        plt.xlabel('distanse (m)')
+        plt.show()
         plots = {
             'f_dist': zip(s.x, s.friction),
             'f_t': s.friction,
@@ -161,11 +190,14 @@ for k, v in data_dict.items():
             'acc_t': s.acc,
             'N_dist': zip(s.x, s.normalforce),
             'N_t': s.normalforce,
+            'V_x': zip(s.x, s.velocity),
             'EULER_acc_dist': zip(s.euler_dist, s.euler_acc),
             'EULER_acc_t': s.euler_acc,
-            'EULER_dist': s.euler_dist
+            'EULER_dist': s.euler_dist,
+            'EULER_y': zip(s.euler_dist, s.euler_y),
+            'EULER_vel': zip(s.euler_dist, s.euler_velocity)
         }
-        REAL_PLOT = 'acc_t'
+        REAL_PLOT = 'f_dist'
         EULER_PLOT = 'EULER_acc_t'
 
         # TODO: set x,y data here
@@ -184,6 +216,9 @@ for k, v in data_dict.items():
             except KeyError:
                 euler_vals[current_time] = []
             current_time += 1
+
+
+
 
     """ PRUNE INVALID SETS (less than valid data) """
     invalid_euler_keys = []
@@ -228,17 +263,24 @@ for k, v in data_dict.items():
         avg = np.mean(y_data)
         euler_y_axis.append(avg)
         euler_y_axis_err.append(std)
-        print("var: " + str(variance) + ", std: " + str(std) + ", avg: " + str(avg))
+        #  print("var: " + str(variance) + ", std: " + str(std) + ", avg: " + str(avg))
+
     #  y_axis = y_axis[:len(x_axis)]
     y_axis_err = y_axis_err[:len(x_axis)]
-    print('x,y: ' + str(len(x_axis)) + ', ' + str(len(y_axis)) )
-    print('x,y euler: ' + str(len(x_axis)) + ', ' + str(len(euler_y_axis)) )
+    #  print('x,y: ' + str(len(x_axis)) + ', ' + str(len(y_axis)) )
+    #  print('x,y euler: ' + str(len(x_axis)) + ', ' + str(len(euler_y_axis)) )
     #  plt.plot(x_axis, y_axis)
     plt.plot(x_axis, euler_y_axis, euler_colors[k])
     plt.errorbar(x_axis, y_axis, yerr=y_axis_err, fmt=colors[k])
+    #  plt.show()
 
-# do something with s here
+    # do something with s here
+    #  fig.tight_layout()
+    #  plt.title(k)
 plt.legend(handles=[Linear, Sine, Steep])
-plt.ylabel('akselerasjon (m/s^2)')
-plt.xlabel('tid/ramme (100 fps)')
+#  plt.ylabel('akselerasjon (m/s^2)')
+#  plt.xlabel('tid/ramme (100 fps)')
+plt.ylabel('friksjon (N)')
+plt.xlabel('distanse (m)')
+plt.errorbar(x_axis, y_axis, yerr=y_axis_err, fmt=colors[k])
 plt.show()
