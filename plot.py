@@ -22,7 +22,8 @@ Sine = plot_color('blue', 'Sinus')
 Steep = plot_color('green', 'Bratt')
 
 
-colors = {'Linear': 'r--', 'Sine': 'b-', 'Steep': 'g:'}
+colors = {'Linear': 'r-', 'Sine': 'b-', 'Steep': 'g-'}
+euler_colors = {'Linear': 'r:', 'Sine': 'b:', 'Steep': 'g:'}
 
 
 def euler(v, alpha):
@@ -44,6 +45,10 @@ def get_alpha(poly, point):
     return trvalues(poly, point)[3]
 
 
+def get_R(poly, point):
+    return trvalues(poly, point)[4]
+
+
 class Sheet:
     def __init__(self, sheet):
         self.sheet = sheet
@@ -57,7 +62,7 @@ class Sheet:
         # compute the acceleration at each point
         self.acc = [self.compute_acceleration(x) for x in self.x]
         self.friction = [self.compute_friction(x) for x in self.x]
-        self.velocity = []
+        self.normalforce = [self.compute_normal_power(x) for x in self.x]
 
         # for use by eulers method, initialize default values
         self.euler_velocity = [0]
@@ -71,27 +76,28 @@ class Sheet:
     def iptrack(self):
         return np.polyfit(self.x, self.y, 15)
 
+    def compute_normal_power(self, point=None):
+        if point is None:
+            # choose the first point as default initial value
+            point = self.x[0]
+        alpha = get_alpha(self.poly, point)
+        return m * g * math.cos(alpha)
+
     def compute_friction(self, point=None):
         if point is None:
             # choose the first point as default initial value
             point = self.x[0]
-        alpha = trvalues(self.poly, point)[3]
+        alpha = get_alpha(self.poly, point)
         return m * g * math.sin(alpha) + m * self.compute_acceleration(point)
-
-    # return interpolated points by euler
-    def get_euler_dist(self): return self.euler_dist
-
-    def get_euler_acc(self): return self.euler_acc
-
-    def get_euler_velocity(self): return self.euler_velocity
 
     def compute_acceleration(self, point=None):
         if point is None:
             # choose the first point as default initial value
             point = self.x[0]
-        alpha = trvalues(self.poly, point)[3]
+        alpha = get_alpha(self.poly, point)
         return g*math.sin(alpha)/(1+(inertia/m*r**2))
 
+    """ NUMERICS """
     def euler_iteration(self):
         # fetch the first items in the experimental data sets
         x = self.euler_dist[-1]
@@ -136,10 +142,6 @@ def init():
 
 init()
 
-#  max_x_axis_size = -1
-x_axes = []
-y_axes = []
-
 for k, v in data_dict.items():
     print(k)
     # iterate over every xls document
@@ -147,45 +149,43 @@ for k, v in data_dict.items():
     euler_vals = {}  # a list of every point from each list (10)
     real_vals = {}  # decide what metrics to use here, dist/velo/acc
     # for each sheet!
+    time_spent = []
     for s in v:
-        # find the max distance traveled
         s.compute_euler()
-        fig_num += 1
-
-        # add values to the dictionary of lists
-        current_time = 0
-        #  for point in s.get_euler_acc():
-        #      try:
-        #          euler_vals[current_time].append(point)
-        #      except KeyError:
-        #          euler_vals[current_time] = []
-        #      current_time += 1
-        #  current_time = 0
-
-        """
-        friction per distance: zip(s.x, s.friction)
-        friction per time: s.friction
-        y per x: zip(s.x, s.y)
-        y per time: s.y
-        acceleration per dist: zip(s.x, s.acc)
-        acceleration per time: s.acc
-        """
         plots = {
             'f_dist': zip(s.x, s.friction),
             'f_t': s.friction,
             'y_x': zip(s.x, s.y),
             'y_t': s.y,
             'acc_dist': zip(s.x, s.acc),
-            'acc_t': s.acc
+            'acc_t': s.acc,
+            'N_dist': zip(s.x, s.normalforce),
+            'N_t': s.normalforce,
+            'EULER_acc_dist': zip(s.euler_dist, s.euler_acc),
+            'EULER_acc_t': s.euler_acc,
+            'EULER_dist': s.euler_dist
         }
+        REAL_PLOT = 'acc_t'
+        EULER_PLOT = 'EULER_acc_t'
 
         # TODO: set x,y data here
-        for point in plots['f_dist']:  # plot friction per distance
+        current_time = 0
+        for point in plots[REAL_PLOT]:
             try:
                 real_vals[current_time].append(point)
             except KeyError:
                 real_vals[current_time] = []
             current_time += 1
+
+        current_time = 0
+        for point in plots[EULER_PLOT]:
+            try:
+                euler_vals[current_time].append(point)
+            except KeyError:
+                euler_vals[current_time] = []
+            current_time += 1
+
+    """ PRUNE INVALID SETS (less than valid data) """
     invalid_euler_keys = []
     for w, e in euler_vals.items():
         if len(e) < 9:
@@ -219,40 +219,26 @@ for k, v in data_dict.items():
         y_axis.append(avg)
         y_axis_err.append(std)
 
-    #  euler_frames = []
-    #  for time, data in euler_vals.items():
-    #      # do something with the data here!
-    #      euler_frames.append(time)
-    #      variance = np.var(data)
-    #      std = np.std(data)
-    #      avg = np.mean(data)
-    #      euler_y_axis.append(avg)
-    #      euler_y_axis_err.append(variance)
-    #      print("var: " + str(variance) + ", std: " + str(std) + ", avg: " + str(avg))
+    for x_data, y_data in euler_vals.items():
+        if type(y_data[0]) == tuple:
+            x_data = np.mean([val[0] for val in y_data])
+            y_data = [val[1] for val in y_data]
+        variance = np.var(y_data)
+        std = np.std(y_data)
+        avg = np.mean(y_data)
+        euler_y_axis.append(avg)
+        euler_y_axis_err.append(std)
+        print("var: " + str(variance) + ", std: " + str(std) + ", avg: " + str(avg))
     #  y_axis = y_axis[:len(x_axis)]
-    #  y_axis_err = y_axis_err[:len(x_axis)]
+    y_axis_err = y_axis_err[:len(x_axis)]
+    print('x,y: ' + str(len(x_axis)) + ', ' + str(len(y_axis)) )
+    print('x,y euler: ' + str(len(x_axis)) + ', ' + str(len(euler_y_axis)) )
     #  plt.plot(x_axis, y_axis)
-    #  plt.plot(x_axis, euler_y_axis)
-    #  plt.errorbar(x_axis, euler_y_axis, yerr=euler_y_axis_err, fmt="-")
-    plt.errorbar(x_axis, y_axis, yerr=y_axis_err, fmt=colors[k], ecolor='#AAAA00')  # fetch the color of the key
-
-    #  x_axes.append(len(x_axis))
-    #  y_axes.append(y_axis)
-
-#  longest_x_len = max(x_axes)
-#  x = np.arange(0, max(x_axes)+1, 1)
-#  print('longest x: ' + str(max(x_axes)))
-#  for y in y_axes:  # iterate data points
-#      new_y = y
-#      while len(new_y) <= max(x_axes):
-#          print('xd')
-#          new_y.append(0)
-#  _color = _colors[k]
-#  plt.errorbar(x, new_y, yerr=y_axis_err, fmt=_color)
-
+    plt.plot(x_axis, euler_y_axis, euler_colors[k])
+    plt.errorbar(x_axis, y_axis, yerr=y_axis_err, fmt=colors[k])
 
 # do something with s here
 plt.legend(handles=[Linear, Sine, Steep])
-plt.ylabel('friksjon (N)')
-plt.xlabel('distanse (m)')
+plt.ylabel('akselerasjon (m/s^2)')
+plt.xlabel('tid/ramme (100 fps)')
 plt.show()
